@@ -21,7 +21,7 @@ jobs:
           ALL_ZIPS="$(find . -path ./.git -prune -o -iname '*.zip' -print)"
           ZIP_COUNT="$(printf '%s\n' "${ALL_ZIPS}" | grep -c . || true)"
           if [ "${ZIP_COUNT}" -eq 0 ]; then
-            echo "::error::No .zip file found in the repository. Upload the mod zip to the repo and re-run."
+            echo "::error::No .zip file found in the repository."
             exit 1
           fi
           ZIP_PATH="$(printf '%s\n' "${ALL_ZIPS}" | head -n 1)"
@@ -49,29 +49,38 @@ jobs:
           sed -i 's/\.getEnchantments()\.getSize()/.getEnchantments().size()/g' "$FILE"
           echo "Patched: $(grep -n 'getEnchantments' "$FILE")"
 
-      # Patch 2: handleFallDamage does not exist on ServerPlayerEntity in 1.20.1.
-      # Fall damage is already blocked by the damage() mixin above (arrow-only guard),
-      # so this secondary mixin is redundant and causes a crash. Remove it entirely.
+      # Patch 2: handleFallDamage doesn't exist on ServerPlayerEntity in 1.20.1.
+      # Fall damage is already blocked by the damage() mixin (arrow-only guard).
       - name: Patch PlayerEntityMixin.java - remove broken handleFallDamage mixin
         shell: bash
         run: |
           FILE="${{ steps.extract.outputs.project_dir }}/src/main/java/com/chameleon/mixin/PlayerEntityMixin.java"
-          python3 - "$FILE" <<'PYEOF'
-          import re, sys
-          src = open(sys.argv[1]).read()
-          # Remove the comment block + @Inject method for handleFallDamage
-          # Remove the @Inject method block
-          src = re.sub(
-              r'\n    // -- Fall damage secondary guard.*?}\n',
-              '',
-              src,
-              flags=re.DOTALL
-          )
-          # Remove the stale javadoc line referencing handleFallDamage
-          src = re.sub(r' \*      handleFallDamage.*?\n', '', src)
-          open(sys.argv[1], 'w').write(src)
-          print("Patched: handleFallDamage mixin removed")
-          PYEOF
+          python3 << PYEOF
+import sys
+lines = open("$FILE").readlines()
+start = next((i for i, l in enumerate(lines) if '// -- Fall damage secondary guard' in l), None)
+if start is None:
+    print("Block not found - skipping")
+    sys.exit(0)
+end = None
+depth = 0
+in_method = False
+for i in range(start, len(lines)):
+    l = lines[i]
+    if '@Inject' in l and 'handleFallDamage' in l:
+        in_method = True
+    if in_method:
+        depth += l.count('{') - l.count('}')
+        if depth <= 0 and '{' in ''.join(lines[start:i+1]):
+            end = i
+            break
+if end is None:
+    print("Could not find end of block - skipping")
+    sys.exit(0)
+print(f"Removing lines {start+1}-{end+1} (handleFallDamage mixin)")
+open("$FILE", 'w').writelines(lines[:start] + lines[end+1:])
+print("Done")
+PYEOF
 
       - name: Set up JDK 21
         uses: actions/setup-java@v4
