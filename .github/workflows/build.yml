@@ -17,50 +17,44 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          echo "Searching for a .zip file in the repository..."
           ALL_ZIPS="$(find . -path ./.git -prune -o -iname '*.zip' -print)"
           ZIP_COUNT="$(printf '%s\n' "${ALL_ZIPS}" | grep -c . || true)"
           if [ "${ZIP_COUNT}" -eq 0 ]; then
-            echo "::error::No .zip file found in the repository."
+            echo "::error::No .zip file found."
             exit 1
           fi
           ZIP_PATH="$(printf '%s\n' "${ALL_ZIPS}" | head -n 1)"
-          if [ "${ZIP_COUNT}" -gt 1 ]; then
-            echo "::warning::Found ${ZIP_COUNT} zip files - using the first one: ${ZIP_PATH}"
-          fi
-          echo "Found zip: ${ZIP_PATH}"
           EXTRACT_DIR="$(mktemp -d "${RUNNER_TEMP}/mod-src-XXXXXX")"
           unzip -q "${ZIP_PATH}" -d "${EXTRACT_DIR}"
-          echo "Extracted to: ${EXTRACT_DIR}"
           BUILD_GRADLE_PATH="$(find "${EXTRACT_DIR}" -maxdepth 4 -iname 'build.gradle' -print | head -n 1)"
           if [ -z "${BUILD_GRADLE_PATH}" ]; then
-            echo "::error::No build.gradle found anywhere inside the extracted zip."
+            echo "::error::No build.gradle found."
             exit 1
           fi
           PROJECT_DIR="$(dirname "${BUILD_GRADLE_PATH}")"
-          echo "Project root detected at: ${PROJECT_DIR}"
           echo "project_dir=${PROJECT_DIR}" >> "${GITHUB_OUTPUT}"
 
-      # Patch 1: NbtList uses size(), not getSize()
-      - name: Patch RoleEffects.java
+      - name: Patch source files
         shell: bash
+        env:
+          PROJECT_DIR: ${{ steps.extract.outputs.project_dir }}
         run: |
-          FILE="${{ steps.extract.outputs.project_dir }}/src/main/java/com/chameleon/role/RoleEffects.java"
-          sed -i 's/\.getEnchantments()\.getSize()/.getEnchantments().size()/g' "$FILE"
-          echo "Patched: $(grep -n 'getEnchantments' "$FILE")"
+          set -euo pipefail
+          SRC="$PROJECT_DIR/src/main/java/com/chameleon"
 
-      # Patch 2: handleFallDamage doesn't exist on ServerPlayerEntity in 1.20.1.
-      # Fall damage is already blocked by the damage() mixin (arrow-only guard).
-      - name: Patch PlayerEntityMixin.java - remove broken handleFallDamage mixin
-        shell: bash
-        run: |
-          FILE="${{ steps.extract.outputs.project_dir }}/src/main/java/com/chameleon/mixin/PlayerEntityMixin.java"
-          python3 << PYEOF
+          # Patch 1: NbtList.getSize() -> size()
+          F1="$SRC/role/RoleEffects.java"
+          sed -i 's/\.getEnchantments()\.getSize()/.getEnchantments().size()/g' "$F1"
+          echo "Patch 1 done: $(grep -n 'getEnchantments' "$F1")"
+
+          # Patch 2: Remove the broken handleFallDamage @Inject block
+          F2="$SRC/mixin/PlayerEntityMixin.java"
+          python3 -c "
 import sys
-lines = open("$FILE").readlines()
-start = next((i for i, l in enumerate(lines) if '// -- Fall damage secondary guard' in l), None)
+lines = open('$F2').readlines()
+start = next((i for i,l in enumerate(lines) if '// -- Fall damage secondary guard' in l), None)
 if start is None:
-    print("Block not found - skipping")
+    print('Patch 2: block not found, skipping')
     sys.exit(0)
 end = None
 depth = 0
@@ -71,27 +65,27 @@ for i in range(start, len(lines)):
         in_method = True
     if in_method:
         depth += l.count('{') - l.count('}')
-        if depth <= 0 and '{' in ''.join(lines[start:i+1]):
+        if depth <= 0 and any('{' in x for x in lines[start:i+1]):
             end = i
             break
 if end is None:
-    print("Could not find end of block - skipping")
+    print('Patch 2: end not found, skipping')
     sys.exit(0)
-print(f"Removing lines {start+1}-{end+1} (handleFallDamage mixin)")
-open("$FILE", 'w').writelines(lines[:start] + lines[end+1:])
-print("Done")
-PYEOF
+print(f'Patch 2: removing lines {start+1}-{end+1}')
+open('$F2','w').writelines(lines[:start] + lines[end+1:])
+print('Patch 2 done')
+"
 
       - name: Set up JDK 21
         uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: '21'
+          java-version: "21"
 
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
-          gradle-version: '8.9'
+          gradle-version: "8.9"
 
       - name: Build mod with Gradle
         shell: bash
