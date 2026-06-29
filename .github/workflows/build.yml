@@ -46,9 +46,14 @@ jobs:
           sed -i 's/\.getEnchantments()\.getSize()/.getEnchantments().size()/g' "$SRC/role/RoleEffects.java"
           echo "Patch 1 done"
 
-          # Patch 2: remove handleFallDamage mixin (base64-encoded to avoid YAML issues)
+          # Patch 2: remove handleFallDamage mixin block from PlayerEntityMixin
           echo "aW1wb3J0IHN5cwpmID0gc3lzLmFyZ3ZbMV0KbGluZXMgPSBvcGVuKGYpLnJlYWRsaW5lcygpCnN0YXJ0ID0gbmV4dCgoaSBmb3IgaSwgbCBpbiBlbnVtZXJhdGUobGluZXMpIGlmICIvLyAtLSBGYWxsIGRhbWFnZSBzZWNvbmRhcnkgZ3VhcmQiIGluIGwpLCBOb25lKQppZiBzdGFydCBpcyBOb25lOgogICAgcHJpbnQoIlBhdGNoIDI6IGJsb2NrIG5vdCBmb3VuZCwgc2tpcHBpbmciKQogICAgc3lzLmV4aXQoMCkKZW5kID0gTm9uZQpkZXB0aCA9IDAKaW5fbWV0aG9kID0gRmFsc2UKZm9yIGkgaW4gcmFuZ2Uoc3RhcnQsIGxlbihsaW5lcykpOgogICAgbCA9IGxpbmVzW2ldCiAgICBpZiAiQEluamVjdCIgaW4gbCBhbmQgImhhbmRsZUZhbGxEYW1hZ2UiIGluIGw6CiAgICAgICAgaW5fbWV0aG9kID0gVHJ1ZQogICAgaWYgaW5fbWV0aG9kOgogICAgICAgIGRlcHRoICs9IGwuY291bnQoInsiKSAtIGwuY291bnQoIn0iKQogICAgICAgIGlmIGRlcHRoIDw9IDAgYW5kIGFueSgieyIgaW4geCBmb3IgeCBpbiBsaW5lc1tzdGFydDppKzFdKToKICAgICAgICAgICAgZW5kID0gaQogICAgICAgICAgICBicmVhawppZiBlbmQgaXMgTm9uZToKICAgIHByaW50KCJQYXRjaCAyOiBlbmQgbm90IGZvdW5kLCBza2lwcGluZyIpCiAgICBzeXMuZXhpdCgwKQpwcmludCgiUGF0Y2ggMjogcmVtb3ZpbmcgbGluZXMge30te30iLmZvcm1hdChzdGFydCsxLCBlbmQrMSkpCm9wZW4oZiwgInciKS53cml0ZWxpbmVzKGxpbmVzWzpzdGFydF0gKyBsaW5lc1tlbmQrMTpdKQpwcmludCgiUGF0Y2ggMiBkb25lIikKCg==" | base64 -d > /tmp/patch2.py
           python3 /tmp/patch2.py "$SRC/mixin/PlayerEntityMixin.java"
+
+          # Patch 3: delete PlayerModelMixin (broken @Shadow fields in 1.20.1)
+          # and remove it from chameleon.mixins.json
+          echo "aW1wb3J0IHN5cywganNvbiwgb3MKCnNyY19kaXIgPSBzeXMuYXJndlsxXQoKIyAxKSBQbGF5ZXJNb2RlbE1peGluLmphdmEgZG9zeWFzxLFuxLEgc2lsCm1peGluX2ZpbGUgPSBvcy5wYXRoLmpvaW4oc3JjX2RpciwgInNyYy9tYWluL2phdmEvY29tL2NoYW1lbGVvbi9taXhpbi9QbGF5ZXJNb2RlbE1peGluLmphdmEiKQppZiBvcy5wYXRoLmV4aXN0cyhtaXhpbl9maWxlKToKICAgIG9zLnJlbW92ZShtaXhpbl9maWxlKQogICAgcHJpbnQoIlBhdGNoIDNhOiBQbGF5ZXJNb2RlbE1peGluLmphdmEgZGVsZXRlZCIpCmVsc2U6CiAgICBwcmludCgiUGF0Y2ggM2E6IFBsYXllck1vZGVsTWl4aW4uamF2YSBub3QgZm91bmQsIHNraXBwaW5nIikKCiMgMikgY2hhbWVsZW9uLm1peGlucy5qc29uIGRvc3lhc8SxbmRhbiBQbGF5ZXJNb2RlbE1peGluIHNhdGlyaW5pIGthbGRpcgpqc29uX2ZpbGUgPSBvcy5wYXRoLmpvaW4oc3JjX2RpciwgInNyYy9tYWluL3Jlc291cmNlcy9jaGFtZWxlb24ubWl4aW5zLmpzb24iKQppZiBvcy5wYXRoLmV4aXN0cyhqc29uX2ZpbGUpOgogICAgZGF0YSA9IGpzb24ubG9hZChvcGVuKGpzb25fZmlsZSkpCiAgICBiZWZvcmUgPSBkYXRhLmdldCgiY2xpZW50IiwgW10pCiAgICBkYXRhWyJjbGllbnQiXSA9IFt4IGZvciB4IGluIGJlZm9yZSBpZiB4ICE9ICJQbGF5ZXJNb2RlbE1peGluIl0KICAgIGpzb24uZHVtcChkYXRhLCBvcGVuKGpzb25fZmlsZSwgInciKSwgaW5kZW50PTIpCiAgICBwcmludCgiUGF0Y2ggM2I6IFBsYXllck1vZGVsTWl4aW4gcmVtb3ZlZCBmcm9tIGNoYW1lbGVvbi5taXhpbnMuanNvbiIpCmVsc2U6CiAgICBwcmludCgiUGF0Y2ggM2I6IGNoYW1lbGVvbi5taXhpbnMuanNvbiBub3QgZm91bmQsIHNraXBwaW5nIikKCg==" | base64 -d > /tmp/patch3.py
+          python3 /tmp/patch3.py "$PROJECT_DIR"
 
       - name: Set up JDK 21
         uses: actions/setup-java@v4
