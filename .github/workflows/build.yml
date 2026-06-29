@@ -43,38 +43,12 @@ jobs:
           SRC="$PROJECT_DIR/src/main/java/com/chameleon"
 
           # Patch 1: NbtList.getSize() -> size()
-          F1="$SRC/role/RoleEffects.java"
-          sed -i 's/\.getEnchantments()\.getSize()/.getEnchantments().size()/g' "$F1"
-          echo "Patch 1 done: $(grep -n 'getEnchantments' "$F1")"
+          sed -i 's/\.getEnchantments()\.getSize()/.getEnchantments().size()/g' "$SRC/role/RoleEffects.java"
+          echo "Patch 1 done"
 
-          # Patch 2: Remove the broken handleFallDamage @Inject block
-          F2="$SRC/mixin/PlayerEntityMixin.java"
-          python3 -c "
-import sys
-lines = open('$F2').readlines()
-start = next((i for i,l in enumerate(lines) if '// -- Fall damage secondary guard' in l), None)
-if start is None:
-    print('Patch 2: block not found, skipping')
-    sys.exit(0)
-end = None
-depth = 0
-in_method = False
-for i in range(start, len(lines)):
-    l = lines[i]
-    if '@Inject' in l and 'handleFallDamage' in l:
-        in_method = True
-    if in_method:
-        depth += l.count('{') - l.count('}')
-        if depth <= 0 and any('{' in x for x in lines[start:i+1]):
-            end = i
-            break
-if end is None:
-    print('Patch 2: end not found, skipping')
-    sys.exit(0)
-print(f'Patch 2: removing lines {start+1}-{end+1}')
-open('$F2','w').writelines(lines[:start] + lines[end+1:])
-print('Patch 2 done')
-"
+          # Patch 2: remove handleFallDamage mixin (base64-encoded to avoid YAML issues)
+          echo "aW1wb3J0IHN5cwpmID0gc3lzLmFyZ3ZbMV0KbGluZXMgPSBvcGVuKGYpLnJlYWRsaW5lcygpCnN0YXJ0ID0gbmV4dCgoaSBmb3IgaSwgbCBpbiBlbnVtZXJhdGUobGluZXMpIGlmICIvLyAtLSBGYWxsIGRhbWFnZSBzZWNvbmRhcnkgZ3VhcmQiIGluIGwpLCBOb25lKQppZiBzdGFydCBpcyBOb25lOgogICAgcHJpbnQoIlBhdGNoIDI6IGJsb2NrIG5vdCBmb3VuZCwgc2tpcHBpbmciKQogICAgc3lzLmV4aXQoMCkKZW5kID0gTm9uZQpkZXB0aCA9IDAKaW5fbWV0aG9kID0gRmFsc2UKZm9yIGkgaW4gcmFuZ2Uoc3RhcnQsIGxlbihsaW5lcykpOgogICAgbCA9IGxpbmVzW2ldCiAgICBpZiAiQEluamVjdCIgaW4gbCBhbmQgImhhbmRsZUZhbGxEYW1hZ2UiIGluIGw6CiAgICAgICAgaW5fbWV0aG9kID0gVHJ1ZQogICAgaWYgaW5fbWV0aG9kOgogICAgICAgIGRlcHRoICs9IGwuY291bnQoInsiKSAtIGwuY291bnQoIn0iKQogICAgICAgIGlmIGRlcHRoIDw9IDAgYW5kIGFueSgieyIgaW4geCBmb3IgeCBpbiBsaW5lc1tzdGFydDppKzFdKToKICAgICAgICAgICAgZW5kID0gaQogICAgICAgICAgICBicmVhawppZiBlbmQgaXMgTm9uZToKICAgIHByaW50KCJQYXRjaCAyOiBlbmQgbm90IGZvdW5kLCBza2lwcGluZyIpCiAgICBzeXMuZXhpdCgwKQpwcmludCgiUGF0Y2ggMjogcmVtb3ZpbmcgbGluZXMge30te30iLmZvcm1hdChzdGFydCsxLCBlbmQrMSkpCm9wZW4oZiwgInciKS53cml0ZWxpbmVzKGxpbmVzWzpzdGFydF0gKyBsaW5lc1tlbmQrMTpdKQpwcmludCgiUGF0Y2ggMiBkb25lIikKCg==" | base64 -d > /tmp/patch2.py
+          python3 /tmp/patch2.py "$SRC/mixin/PlayerEntityMixin.java"
 
       - name: Set up JDK 21
         uses: actions/setup-java@v4
